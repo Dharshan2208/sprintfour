@@ -28,6 +28,7 @@ from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, Field
 
 from app.api.schemas.responses import ApiResponse, MetaResponse
+from typing import List
 from app.core.config import settings
 from app.services.review_service import ReviewService
 
@@ -419,6 +420,80 @@ async def get_review_history(
             "document_id": document_id,
             "total_events": len(history),
             "events": history,
+        },
+        meta=MetaResponse(
+            request_id=getattr(request.state, "request_id", "N/A"),
+            timestamp="",
+        ),
+    )
+
+
+# ── Batch endpoints (for quick correction workflow) ────────────────
+
+class BatchActionRequest(BaseModel):
+    """Request body for batch approve/reject."""
+    document_id: str = Field(..., description="ID of the document")
+    detection_ids: List[str] = Field(..., description="List of detection IDs to act on")
+    actor: str = Field(default="unknown", description="Who is performing the action")
+    reason: Optional[str] = Field(default=None, description="Why this action is being taken")
+
+
+@router.post(
+    "/batch-approve",
+    summary="Approve multiple detections at once",
+    response_model=ApiResponse[Dict[str, Any]],
+    status_code=status.HTTP_200_OK,
+)
+async def batch_approve_detections(
+    request: Request,
+    body: BatchActionRequest,
+) -> ApiResponse[Dict[str, Any]]:
+    """Approve multiple detections in a single request."""
+    items = _review_service.batch_approve(
+        document_id=body.document_id,
+        detection_ids=body.detection_ids,
+        actor=body.actor,
+        reason=body.reason,
+    )
+
+    return ApiResponse(
+        message=f"{len(items)} detections approved",
+        data={
+            "document_id": body.document_id,
+            "processed_count": len(items),
+            "items": [_item_to_dict(item) for item in items],
+        },
+        meta=MetaResponse(
+            request_id=getattr(request.state, "request_id", "N/A"),
+            timestamp="",
+        ),
+    )
+
+
+@router.post(
+    "/batch-reject",
+    summary="Reject multiple detections at once (false positives)",
+    response_model=ApiResponse[Dict[str, Any]],
+    status_code=status.HTTP_200_OK,
+)
+async def batch_reject_detections(
+    request: Request,
+    body: BatchActionRequest,
+) -> ApiResponse[Dict[str, Any]]:
+    """Reject multiple detections as false positives in a single request."""
+    items = _review_service.batch_reject(
+        document_id=body.document_id,
+        detection_ids=body.detection_ids,
+        actor=body.actor,
+        reason=body.reason,
+    )
+
+    return ApiResponse(
+        message=f"{len(items)} detections rejected",
+        data={
+            "document_id": body.document_id,
+            "processed_count": len(items),
+            "items": [_item_to_dict(item) for item in items],
         },
         meta=MetaResponse(
             request_id=getattr(request.state, "request_id", "N/A"),

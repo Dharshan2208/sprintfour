@@ -346,6 +346,102 @@ class ReviewService:
         )
 
     # ──────────────────────────────────────────────────────────────
+    # Batch Operations (for quick correction)
+    # ──────────────────────────────────────────────────────────────
+
+    def batch_approve(
+        self,
+        document_id: str,
+        detection_ids: List[str],
+        actor: str = "unknown",
+        reason: Optional[str] = None,
+    ) -> List[ReviewItem]:
+        """
+        Approve multiple detections at once.
+
+        Parameters
+        ----------
+        document_id : str
+            The document the detections belong to.
+        detection_ids : list of str
+            The detection IDs to approve.
+        actor : str
+            Who is performing the action.
+        reason : str, optional
+            Why these detections are being approved.
+
+        Returns
+        -------
+        list of ReviewItem
+            The updated review items.
+        """
+        items: List[ReviewItem] = []
+        for detection_id in detection_ids:
+            try:
+                item = self.approve_detection(
+                    document_id=document_id,
+                    detection_id=detection_id,
+                    actor=actor,
+                    reason=reason or "Batch approved",
+                )
+                items.append(item)
+            except Exception as exc:
+                logger.warning(
+                    "Batch approve failed for detection",
+                    extra={
+                        "detection_id": detection_id,
+                        "error": str(exc),
+                    },
+                )
+        return items
+
+    def batch_reject(
+        self,
+        document_id: str,
+        detection_ids: List[str],
+        actor: str = "unknown",
+        reason: Optional[str] = None,
+    ) -> List[ReviewItem]:
+        """
+        Reject multiple detections at once (false positives).
+
+        Parameters
+        ----------
+        document_id : str
+            The document the detections belong to.
+        detection_ids : list of str
+            The detection IDs to reject.
+        actor : str
+            Who is performing the action.
+        reason : str, optional
+            Why these detections are being rejected.
+
+        Returns
+        -------
+        list of ReviewItem
+            The updated review items.
+        """
+        items: List[ReviewItem] = []
+        for detection_id in detection_ids:
+            try:
+                item = self.reject_detection(
+                    document_id=document_id,
+                    detection_id=detection_id,
+                    actor=actor,
+                    reason=reason or "Batch rejected as false positive",
+                )
+                items.append(item)
+            except Exception as exc:
+                logger.warning(
+                    "Batch reject failed for detection",
+                    extra={
+                        "detection_id": detection_id,
+                        "error": str(exc),
+                    },
+                )
+        return items
+
+    # ──────────────────────────────────────────────────────────────
     # Undo / Redo
     # ──────────────────────────────────────────────────────────────
 

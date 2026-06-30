@@ -60,7 +60,7 @@ async def run_detection(
             {
                 "id": d.id,
                 "entity": d.entity,
-                "type": d.entity_type,
+                "entity_type": d.entity_type,
                 "confidence": d.confidence,
                 "reason": d.reason,
                 "sources": d.sources,
@@ -69,7 +69,7 @@ async def run_detection(
                 "page": d.page,
                 "line": d.line,
                 "status": d.status,
-                "review_state": d.review_state,
+                "review_state": "system_generated",
             }
             for d in result.detections
         ],

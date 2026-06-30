@@ -13,7 +13,7 @@ from fastapi import APIRouter, UploadFile, File, Request, status
 
 from app.api.schemas.responses import ApiResponse, MetaResponse
 from app.core.config import settings
-from app.core.exceptions import UnsupportedFileException
+from app.core.exceptions import ResourceNotFoundException, UnsupportedFileException
 from app.services.document_service import DocumentService
 from app.store.document_store import document_store
 
@@ -90,5 +90,85 @@ async def upload_document(
         meta=MetaResponse(
             request_id=getattr(request.state, "request_id", "N/A"),
             timestamp="",  # Will be populated by middleware in future
+        ),
+    )
+
+
+@router.get(
+    "/{document_id}",
+    summary="Retrieve a processed document",
+    response_model=ApiResponse[Dict[str, Any]],
+    status_code=status.HTTP_200_OK,
+)
+async def get_document(
+    request: Request,
+    document_id: str,
+) -> ApiResponse[Dict[str, Any]]:
+    """
+    Retrieve normalized document text, metadata, and page structure
+    for rendering in the review workspace.
+    """
+    normalized_doc = document_store.get(document_id)
+    if normalized_doc is None:
+        raise ResourceNotFoundException(
+            message=f"Document '{document_id}' not found.",
+        )
+
+    text_preview = normalized_doc.text[:200]
+    if len(normalized_doc.text) > 200:
+        text_preview += "…"
+
+    pages = [
+        {
+            "page_number": page.page_number,
+            "text": page.text,
+            "start_offset": page.start_offset,
+            "end_offset": page.end_offset,
+            "paragraphs": [
+                {
+                    "paragraph_number": paragraph.paragraph_number,
+                    "text": paragraph.text,
+                    "start_offset": paragraph.start_offset,
+                    "end_offset": paragraph.end_offset,
+                    "lines": [
+                        {
+                            "text": line.text,
+                            "line_number": line.line_number,
+                            "start_offset": line.start_offset,
+                            "end_offset": line.end_offset,
+                        }
+                        for line in paragraph.lines
+                    ],
+                }
+                for paragraph in page.paragraphs
+            ],
+        }
+        for page in normalized_doc.original_document.pages
+    ]
+
+    response_data = {
+        "document_id": normalized_doc.document_id,
+        "text": normalized_doc.text,
+        "metadata": {
+            "filename": normalized_doc.metadata.filename,
+            "file_size": normalized_doc.metadata.file_size,
+            "mime_type": normalized_doc.metadata.mime_type,
+            "extension": normalized_doc.metadata.extension,
+            "upload_timestamp": normalized_doc.metadata.upload_timestamp.isoformat(),
+            "processing_status": normalized_doc.metadata.processing_status,
+        },
+        "page_count": normalized_doc.original_document.page_count,
+        "character_count": normalized_doc.original_document.character_count,
+        "text_preview": text_preview,
+        "pages": pages,
+        "processing_status": "ready",
+    }
+
+    return ApiResponse(
+        message="Document retrieved successfully",
+        data=response_data,
+        meta=MetaResponse(
+            request_id=getattr(request.state, "request_id", "N/A"),
+            timestamp="",
         ),
     )

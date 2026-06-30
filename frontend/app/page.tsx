@@ -1,129 +1,175 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
-import { TopNav } from "../components/top-nav";
-import { DocumentViewer } from "../components/document-viewer";
-import { ReviewQueue } from "../components/review-queue";
-import { DetectionDetailDrawer } from "../components/detection-detail-drawer";
-import { ExportValidationModal } from "../components/export-validation-modal";
-import { detections } from "../lib/mock-data";
-import { useDetectionSelection } from "../hooks/use-detection-selection";
-import { useKeyboardShortcuts } from "../hooks/use-keyboard-shortcuts";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { FileUp, Loader2, ShieldAlert } from "lucide-react";
+import { AppLayout } from "../components/layout/app-layout";
+import {
+  loadDocumentRegistry,
+  upsertDocumentEntry,
+} from "../lib/document-registry";
+import type { DocumentListEntry } from "../lib/types";
+import { uploadDocument } from "../services/documents";
+import { cn } from "../lib/utils";
 
-export default function Home() {
-  const { items, active, setActiveId, updateStatus, keyboardHandlers, stats } =
-    useDetectionSelection(detections);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [mode] = useState<"ready" | "loading" | "error">("ready");
+export default function DashboardPage() {
+  const router = useRouter();
+  const [documents, setDocuments] = useState<DocumentListEntry[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useKeyboardShortcuts({
-    onPrimaryAction: () => active && updateStatus(active.id, "approved"),
-    onReject: () => active && updateStatus(active.id, "rejected"),
-    onNext: keyboardHandlers.next,
-    onPrevious: keyboardHandlers.previous,
-    onToggleDetails: () => active && setDetailOpen((v) => !v),
-    onCloseSurface: () => {
-      if (detailOpen) setDetailOpen(false);
-      if (exportOpen) setExportOpen(false);
-    },
-  });
+  useEffect(() => {
+    setDocuments(loadDocumentRegistry());
+  }, []);
 
-  const handleSelect = (d: (typeof items)[number]) => {
-    setActiveId(d.id);
-  };
-  const fullyReviewed = useMemo(() => stats.unreviewed === 0, [stats.unreviewed]);
+  async function handleUpload(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const result = await uploadDocument(file);
+      upsertDocumentEntry({
+        documentId: result.document_id,
+        filename: result.metadata.filename,
+        uploadedAt: new Date().toISOString(),
+        pageCount: result.page_count,
+        detectionCount: 0,
+        reviewPercentage: 0,
+        overallRisk: 0,
+        exportReady: false,
+      });
+      setDocuments(loadDocumentRegistry());
+      router.push(`/document/${result.document_id}`);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-[#050509] to-[#05060a]">
-      <TopNav remaining={stats.unreviewed} onExport={() => setExportOpen(true)} />
-      <main className="flex flex-1 flex-col gap-3 px-3 pb-4 pt-3 md:px-4">
-        {mode === "loading" ? (
-          <LoadState />
-        ) : mode === "error" ? (
-          <ErrorState />
-        ) : (
-          <section className="grid flex-1 gap-3 md:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
-            <DocumentViewer
-              detections={items}
-              activeId={active?.id ?? null}
-              onSelect={handleSelect}
-            />
-            <div className="flex h-full flex-col">
-              <ReviewQueue
-                items={items}
-                activeId={active?.id ?? null}
-                onSelect={handleSelect}
-                onApprove={(id) => updateStatus(id, "approved")}
-                onReject={(id) => updateStatus(id, "rejected")}
-                onMarkMissed={(id) => updateStatus(id, "missed")}
-                stats={stats}
-              />
-              <AnimatePresence>
-                {fullyReviewed && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="mt-2 flex items-center justify-between rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-50"
-                  >
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>All issues reviewed. Run final safety validation before export.</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setExportOpen(true)}
-                      className="rounded-md border border-emerald-500/60 bg-emerald-500/20 px-2.5 py-1 text-[10px] font-medium text-emerald-50 hover:bg-emerald-500/25"
-                    >
-                      Validate
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+    <AppLayout>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 p-6">
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+              Dashboard
+            </p>
+            <h1 className="mt-1 text-2xl font-medium text-slate-50">Human review workbench</h1>
+            <p className="mt-1 max-w-2xl text-sm text-[var(--muted-foreground)]">
+              Upload a document, review AI detections in risk-priority order, and export only after
+              backend validation passes.
+            </p>
+          </div>
+        </header>
+
+        <UploadZone uploading={uploading} onUpload={handleUpload} error={error} />
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-slate-100">Documents</h2>
+            <span className="text-[11px] text-[var(--muted-foreground)]">{documents.length} total</span>
+          </div>
+
+          {documents.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-8 text-center text-sm text-[var(--muted-foreground)]">
+              No documents yet. Upload a TXT, PDF, or DOCX file to begin review.
             </div>
-          </section>
-        )}
-      </main>
-
-      <DetectionDetailDrawer
-        detection={active ?? null}
-        open={detailOpen && !!active}
-        onClose={() => setDetailOpen(false)}
-      />
-
-      <ExportValidationModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        detections={items}
-      />
-    </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {documents.map((doc) => (
+                <DocumentCard key={doc.documentId} document={doc} />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </AppLayout>
   );
 }
 
-function LoadState() {
+function UploadZone({
+  uploading,
+  onUpload,
+  error,
+}: {
+  uploading: boolean;
+  onUpload: (file: File) => void;
+  error: string | null;
+}) {
   return (
-    <div className="grid flex-1 place-items-center rounded-xl border border-[var(--border-subtle)] bg-[rgba(9,11,20,0.8)]">
-      <div className="flex items-center gap-3 text-[12px] text-[var(--muted-foreground)]">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span>Analyzing detections and building risk-prioritized queue...</span>
-      </div>
-    </div>
+    <label
+      className={cn(
+        "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] bg-[rgba(9,11,20,0.6)] px-6 py-10 transition",
+        "hover:border-sky-500/40 hover:bg-sky-500/5",
+      )}
+    >
+      <input
+        type="file"
+        accept=".txt,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        className="hidden"
+        disabled={uploading}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) onUpload(file);
+        }}
+      />
+      {uploading ? (
+        <Loader2 className="h-6 w-6 animate-spin text-sky-300" />
+      ) : (
+        <FileUp className="h-6 w-6 text-sky-300" />
+      )}
+      <p className="mt-3 text-sm text-slate-100">
+        {uploading ? "Uploading and extracting text…" : "Drop a document or click to upload"}
+      </p>
+      <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">TXT · PDF · DOCX</p>
+      {error && <p className="mt-3 text-[11px] text-rose-300">{error}</p>}
+    </label>
   );
 }
 
-function ErrorState() {
+function DocumentCard({ document }: { document: DocumentListEntry }) {
   return (
-    <div className="grid flex-1 place-items-center rounded-xl border border-rose-500/30 bg-rose-500/5">
-      <div className="flex max-w-md flex-col items-center gap-2 text-center">
-        <AlertCircle className="h-5 w-5 text-rose-300" />
-        <p className="text-sm text-rose-100">Detection analysis failed</p>
-        <p className="text-xs text-[var(--muted-foreground)]">
-          Unable to load AI findings. Retry analysis before continuing review.
-        </p>
+    <Link
+      href={`/document/${document.documentId}`}
+      className="rounded-xl border border-[var(--border-subtle)] bg-[rgba(9,11,20,0.96)] p-4 transition hover:border-sky-500/40 hover:bg-sky-500/5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="line-clamp-2 text-sm font-medium text-slate-100">{document.filename}</p>
+          <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+            {new Date(document.uploadedAt).toLocaleString()}
+          </p>
+        </div>
+        <div
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-mono",
+            document.exportReady
+              ? "bg-emerald-500/10 text-emerald-100"
+              : "bg-amber-500/10 text-amber-100",
+          )}
+        >
+          {document.exportReady ? "Ready" : "Review"}
+        </div>
       </div>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-[10px] text-[var(--muted-foreground)]">
+        <Metric label="Pages" value={String(document.pageCount)} />
+        <Metric label="Detections" value={String(document.detectionCount)} />
+        <Metric label="Reviewed" value={`${document.reviewPercentage}%`} />
+      </div>
+      <div className="mt-3 flex items-center gap-1.5 text-[10px] text-amber-100/90">
+        <ShieldAlert className="h-3.5 w-3.5" />
+        <span>Risk score {document.overallRisk}</span>
+      </div>
+    </Link>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-[var(--border-subtle)] bg-black/20 px-2 py-1.5">
+      <div className="uppercase tracking-[0.14em]">{label}</div>
+      <div className="mt-0.5 font-mono text-slate-100">{value}</div>
     </div>
   );
 }
