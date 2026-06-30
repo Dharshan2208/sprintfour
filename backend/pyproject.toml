@@ -1,0 +1,23 @@
+[project]
+name = "anonymization-service"
+version = "0.1.0"
+description = "Backend foundation for AI-assisted document anonymization SaaS"
+authors = [{ name = "Your Name", email = "your.email@example.com" }]
+dependencies = [
+    "fastapi==0.104.1", # Use specific version for reproducibility
+    "uvicorn[standard]==0.24.0.post1", # Use specific version, standard includes httptools, uvloop
+    "pydantic-settings==2.0.3", # Use specific version
+    "python-dotenv==1.0.0", # Use specific version
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"] # This tells setuptools to find packages under the 'app' directory
+
+[tool.setuptools.package-data]
+"app" = ["py.typed"] # If we had type stubs to include
+
