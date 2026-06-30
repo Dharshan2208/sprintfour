@@ -1,0 +1,7 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0.post1
+pydantic-settings==2.0.3
+python-dotenv==1.0.0
+PyMuPDF>=1.26
+python-docx==1.1.0
+google-generativeai==0.3.2

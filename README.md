@@ -16,7 +16,7 @@ cp .env.example .env
 # Edit .env: set GEMINI_API_KEY="your-key-here"
 
 # 3. Backend — start the API server
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:create_app --factory --reload
 ```
 
 ```bash
