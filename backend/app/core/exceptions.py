@@ -1,5 +1,10 @@
 from typing import Dict, Any, Optional
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND, HTTP_500_INTERNAL_SERVER_ERROR
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_404_NOT_FOUND,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_502_BAD_GATEWAY,
+)
 
 class AppException(Exception):
     """
@@ -62,3 +67,69 @@ class InternalServerException(AppException):
     status_code = HTTP_500_INTERNAL_SERVER_ERROR
     error_code = "INTERNAL_SERVER_ERROR"
     message = "An internal server error occurred."
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Phase 2 — Document Processing Exceptions
+# ──────────────────────────────────────────────────────────────────────
+
+class DocumentExtractionException(BadRequestException):
+    """
+    Raised when text extraction from a document file fails.
+    The file may be corrupt, encrypted, or in an unsupported sub-format.
+
+    HTTP 400 — the user's file is the problem; they need to provide a
+    valid document.
+    """
+    error_code = "DOCUMENT_EXTRACTION_FAILED"
+    message = "Failed to extract text from the document. The file may be corrupted or encrypted."
+
+
+class UnsupportedFileException(BadRequestException):
+    """
+    Raised when the uploaded file type is not supported by the system.
+
+    HTTP 400 — the user provided a file format we don't handle (e.g.,
+    .xlsx, .odt, image-only PDF).
+    """
+    error_code = "UNSUPPORTED_FILE_TYPE"
+    message = "The uploaded file type is not supported. Supported types: TXT, PDF, DOCX."
+
+
+class NormalizationException(InternalServerException):
+    """
+    Raised when text normalization fails unexpectedly.
+
+    HTTP 500 — if valid extracted text cannot be normalized, something
+    is wrong internally. The user cannot fix this.
+    """
+    error_code = "NORMALIZATION_FAILED"
+    message = "Failed to normalize extracted document text."
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Phase 3 — Detection Exceptions
+# ──────────────────────────────────────────────────────────────────────
+
+class DetectionException(InternalServerException):
+    """
+    Raised when the detection pipeline encounters an unexpected error.
+
+    HTTP 500 — internal logic error in one of the detectors, merger,
+    or confidence engine.
+    """
+    error_code = "DETECTION_FAILED"
+    message = "An error occurred during PII detection."
+
+
+class GeminiException(AppException):
+    """
+    Raised when the upstream Gemini API fails.
+
+    HTTP 502 (Bad Gateway) — the upstream service is unavailable,
+    returned an error, or gave unparseable output. This is distinct
+    from a generic 500 so monitoring can alert on upstream health.
+    """
+    status_code = HTTP_502_BAD_GATEWAY
+    error_code = "GEMINI_API_ERROR"
+    message = "The AI detection service (Gemini) returned an error or is unavailable."

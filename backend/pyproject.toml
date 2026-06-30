@@ -8,6 +8,9 @@ dependencies = [
     "uvicorn[standard]==0.24.0.post1", # Use specific version, standard includes httptools, uvloop
     "pydantic-settings==2.0.3", # Use specific version
     "python-dotenv==1.0.0", # Use specific version
+    "PyMuPDF==1.23.7", # PDF text extraction
+    "python-docx==1.1.0", # DOCX text extraction
+    "google-generativeai==0.3.2", # Gemini API client
 ]
 
 [build-system]
