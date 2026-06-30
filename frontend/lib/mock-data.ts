@@ -1,0 +1,210 @@
+import { Detection, DocumentMetadata, ReviewStats } from "./types";
+
+export const documentParagraphs: string[] = [
+  "This Master Services Agreement (\"Agreement\") is entered into as of March 12, 2026 between Acme Analytics Inc., a Delaware corporation with its principal place of business at 712 Market Street, San Francisco, CA 94103 (\"Provider\"), and Northbridge Health Systems LLC, located at 84 Riverside Drive, Boston, MA 02116 (\"Customer\").",
+  "The primary business contact for Provider is Jane Doe, reachable at jane.doe@acme-analytics.com and +1 (415) 555-0192. The primary security contact for Customer is Michael Turner, Chief Security Officer, reachable at michael.turner@northbridgehealth.com and +1 (617) 555-4421.",
+  "Customer may transfer limited protected health information (\"PHI\"), including patient identifiers such as full name, date of birth, medical record number, and billing account numbers, to Provider solely for the purpose of performing de-identification and analytics services.",
+  "Provider agrees not to retain any direct identifiers beyond the retention window specified in Exhibit B, except where retention is required by applicable law or for documented security investigations.",
+  "For payment of services, Customer will remit fees via ACH transfer from account ending in 4829 at New England Federal Bank. Provider will issue invoices to the Accounts Payable department at ap@northbridgehealth.com within thirty (30) days of month-end.",
+  "This Agreement is governed by the laws of the State of New York, without regard to its conflict of law provisions. Any disputes will be resolved in the state or federal courts located in New York County, New York.",
+];
+
+export const detections: Detection[] = [
+  {
+    id: "d1",
+    kind: "name",
+    severity: "critical",
+    confidence: 0.97,
+    status: "unreviewed",
+    text: "Acme Analytics Inc.",
+    explanation: "Organization name that may be considered identifying in some regulatory contexts.",
+    source: "model",
+    paragraphIndex: 0,
+    start: 63,
+    end: 82,
+    createdAt: "2026-06-30T09:15:00Z",
+    auditTrail: [
+      {
+        at: "2026-06-30T09:15:00Z",
+        action: "auto_flagged",
+        by: "system",
+        note: "High-confidence NER match for organization.",
+      },
+    ],
+  },
+  {
+    id: "d2",
+    kind: "address",
+    severity: "high",
+    confidence: 0.9,
+    status: "unreviewed",
+    text: "712 Market Street, San Francisco, CA 94103",
+    explanation: "Full business address containing street, city, state, and ZIP.",
+    source: "pattern",
+    paragraphIndex: 0,
+    start: 133,
+    end: 176,
+    createdAt: "2026-06-30T09:15:02Z",
+    auditTrail: [
+      {
+        at: "2026-06-30T09:15:02Z",
+        action: "auto_flagged",
+        by: "system",
+        note: "Address pattern with high confidence.",
+      },
+    ],
+  },
+  {
+    id: "d3",
+    kind: "email",
+    severity: "high",
+    confidence: 0.94,
+    status: "unreviewed",
+    text: "jane.doe@acme-analytics.com",
+    explanation: "Direct email address for a named individual.",
+    source: "model",
+    paragraphIndex: 1,
+    start: 67,
+    end: 93,
+    createdAt: "2026-06-30T09:15:05Z",
+    auditTrail: [
+      {
+        at: "2026-06-30T09:15:05Z",
+        action: "auto_flagged",
+        by: "system",
+        note: "Email entity linked to personal name.",
+      },
+    ],
+  },
+  {
+    id: "d4",
+    kind: "phone",
+    severity: "high",
+    confidence: 0.89,
+    status: "unreviewed",
+    text: "+1 (415) 555-0192",
+    explanation: "Direct business phone number for a specific contact.",
+    source: "pattern",
+    paragraphIndex: 1,
+    start: 98,
+    end: 116,
+    createdAt: "2026-06-30T09:15:08Z",
+  },
+  {
+    id: "d5",
+    kind: "name",
+    severity: "medium",
+    confidence: 0.55,
+    status: "unreviewed",
+    text: "New England Federal Bank",
+    explanation:
+      "Financial institution name. Likely non-PII business entity, but flagged due to financial context.",
+    source: "model",
+    paragraphIndex: 4,
+    start: 102,
+    end: 127,
+    createdAt: "2026-06-30T09:15:15Z",
+  },
+  {
+    id: "d6",
+    kind: "email",
+    severity: "critical",
+    confidence: 0.96,
+    status: "approved",
+    text: "ap@northbridgehealth.com",
+    explanation: "Generic accounts payable email, approved in prior review pass.",
+    source: "rule",
+    paragraphIndex: 4,
+    start: 167,
+    end: 191,
+    createdAt: "2026-06-30T09:15:20Z",
+    updatedAt: "2026-06-30T09:20:00Z",
+    auditTrail: [
+      {
+        at: "2026-06-30T09:15:20Z",
+        action: "auto_flagged",
+        by: "system",
+      },
+      {
+        at: "2026-06-30T09:20:00Z",
+        action: "approved",
+        by: "reviewer",
+        note: "Alias points to shared mailbox; acceptable per DPA.",
+      },
+    ],
+  },
+  {
+    id: "d7",
+    kind: "name",
+    severity: "medium",
+    confidence: 0.41,
+    status: "rejected",
+    text: "State of New York",
+    explanation:
+      "Detected as potential location-based identifier. Reviewer previously marked as non-PII (false positive).",
+    source: "model",
+    paragraphIndex: 5,
+    start: 33,
+    end: 50,
+    createdAt: "2026-06-30T09:15:25Z",
+    updatedAt: "2026-06-30T09:19:10Z",
+    auditTrail: [
+      {
+        at: "2026-06-30T09:15:25Z",
+        action: "auto_flagged",
+        by: "system",
+      },
+      {
+        at: "2026-06-30T09:19:10Z",
+        action: "rejected",
+        by: "reviewer",
+        note: "Generic jurisdiction, not PII.",
+      },
+    ],
+  },
+  {
+    id: "d8",
+    kind: "name",
+    severity: "critical",
+    confidence: 0.22,
+    status: "missed",
+    text: "Northbridge Health Systems LLC",
+    explanation:
+      "Manually marked as missed. Business name appears in multiple places and should be consistently redacted.",
+    source: "manual",
+    paragraphIndex: 0,
+    start: 215,
+    end: 244,
+    createdAt: "2026-06-30T09:25:00Z",
+    auditTrail: [
+      {
+        at: "2026-06-30T09:25:00Z",
+        action: "marked_missed",
+        by: "reviewer",
+        note: "AI failed to pick this up; added manually.",
+      },
+    ],
+  },
+];
+
+export const documentMetadata: DocumentMetadata = {
+  id: "doc-msa-001",
+  title: "Northbridge – Acme Master Services Agreement",
+  riskScore: 78,
+  totalDetections: detections.length,
+  unreviewedCount: detections.filter((d) => d.status === "unreviewed").length,
+  createdAt: "2026-06-29T15:30:00Z",
+  updatedAt: "2026-06-30T09:25:00Z",
+};
+
+export const reviewStats: ReviewStats = {
+  total: detections.length,
+  reviewed: detections.filter((d) => d.status !== "unreviewed").length,
+  criticalRemaining: detections.filter(
+    (d) => d.status === "unreviewed" && d.severity === "critical",
+  ).length,
+  pendingLowConfidence: detections.filter(
+    (d) => d.status === "unreviewed" && d.confidence < 0.6,
+  ).length,
+};
+
