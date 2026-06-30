@@ -133,3 +133,110 @@ class GeminiException(AppException):
     status_code = HTTP_502_BAD_GATEWAY
     error_code = "GEMINI_API_ERROR"
     message = "The AI detection service (Gemini) returned an error or is unavailable."
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Phase 4 — Human Review Exceptions
+# ──────────────────────────────────────────────────────────────────────
+
+class ReviewException(AppException):
+    """
+    Base exception for human review operation failures.
+
+    HTTP 400 — the review action was invalid (e.g. approving an
+    already-approved detection, editing a rejected detection).
+    """
+    status_code = HTTP_400_BAD_REQUEST
+    error_code = "REVIEW_ERROR"
+    message = "The review operation could not be completed."
+
+
+class InvalidReviewTransitionException(ReviewException):
+    """
+    Raised when a review action is not valid given the current state.
+
+    Example: trying to approve an already-approved detection, or
+    rejecting a detection that has already been exported.
+    """
+    error_code = "INVALID_REVIEW_TRANSITION"
+    message = "The requested review state transition is not allowed."
+
+
+class ReviewNotFoundException(ReviewException):
+    """
+    Raised when trying to act on a detection that does not exist in
+    the review context.
+    """
+    error_code = "REVIEW_ITEM_NOT_FOUND"
+    message = "The specified detection was not found for review."
+
+
+class AuditException(AppException):
+    """
+    Raised when an audit operation fails.
+
+    HTTP 500 — audit should never fail in normal operation. If it
+    does, something is seriously wrong.
+    """
+    status_code = HTTP_500_INTERNAL_SERVER_ERROR
+    error_code = "AUDIT_ERROR"
+    message = "An error occurred while recording the audit event."
+
+
+class HistoryException(AppException):
+    """
+    Raised when an undo/redo operation fails.
+
+    HTTP 400 — e.g. trying to undo when there is nothing to undo.
+    """
+    status_code = HTTP_400_BAD_REQUEST
+    error_code = "HISTORY_ERROR"
+    message = "The undo/redo operation could not be completed."
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Phase 5 — Risk Intelligence Exceptions
+# ──────────────────────────────────────────────────────────────────────
+
+class RiskAnalysisException(AppException):
+    """
+    Raised when risk analysis cannot be completed.
+    """
+    status_code = HTTP_500_INTERNAL_SERVER_ERROR
+    error_code = "RISK_ANALYSIS_ERROR"
+    message = "An error occurred during risk analysis."
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Phase 6 — Validation & Export Exceptions
+# ──────────────────────────────────────────────────────────────────────
+
+class ExportValidationException(ValidationException):
+    """
+    Raised when export validation fails.
+
+    This means the document is not safe to export.  The error data
+    should include specific details about what failed.
+    """
+    error_code = "EXPORT_VALIDATION_FAILED"
+    message = "The document is not safe for export."
+
+
+class ExportException(AppException):
+    """
+    Base exception for export failures.
+
+    HTTP 500 — export is an internal operation that should not fail
+    if validation passed.
+    """
+    status_code = HTTP_500_INTERNAL_SERVER_ERROR
+    error_code = "EXPORT_ERROR"
+    message = "An error occurred during export."
+
+
+class RedactionException(ExportException):
+    """
+    Raised when the redaction engine cannot process the document.
+    """
+    error_code = "REDACTION_ERROR"
+    message = "An error occurred while applying redactions."

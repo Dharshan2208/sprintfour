@@ -3,6 +3,9 @@ from fastapi import APIRouter
 from app.api.v1.routes.health import router as health_router_v1
 from app.api.v1.routes.documents import router as documents_router_v1
 from app.api.v1.routes.detection import router as detection_router_v1
+from app.api.v1.routes.review import router as review_router_v1
+from app.api.v1.routes.risk import router as risk_router_v1
+from app.api.v1.routes.export import router as export_router_v1
 
 api_router = APIRouter()
 
@@ -10,6 +13,9 @@ api_router = APIRouter()
 api_router.include_router(health_router_v1, prefix="/v1", tags=["Health"])
 api_router.include_router(documents_router_v1, prefix="/v1", tags=["Documents"])
 api_router.include_router(detection_router_v1, prefix="/v1", tags=["Detection"])
+api_router.include_router(review_router_v1, prefix="/v1", tags=["Review"])
+api_router.include_router(risk_router_v1, prefix="/v1", tags=["Risk"])
+api_router.include_router(export_router_v1, prefix="/v1", tags=["Export"])
 
 # Future API versions would be included here, e.g.:
 # from app.api.v2.routes.some_resource import router as some_resource_router_v2
