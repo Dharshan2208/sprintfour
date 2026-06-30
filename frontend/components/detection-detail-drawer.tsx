@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Detection } from "../lib/types";
 import { cn, formatConfidence, formatSeverity, formatStatus } from "../lib/utils";
 import { documentParagraphs } from "../lib/mock-data";
-import { Info, Clock, Flag, FileText } from "lucide-react";
+import { Info, Clock, Flag, FileText, ShieldAlert } from "lucide-react";
 
 interface DetectionDetailDrawerProps {
   detection: Detection | null;
@@ -67,6 +67,30 @@ export function DetectionDetailDrawer({
                   label="Source"
                   value={detection.source === "model" ? "Model" : detection.source}
                 />
+              </section>
+
+              <section className="rounded-md border border-[var(--border-subtle)] bg-[rgba(8,10,18,0.9)] px-2.5 py-2">
+                <div className="mb-1 flex items-center justify-between text-[10px]">
+                  <span className="uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                    Confidence reasoning
+                  </span>
+                  <span className="font-mono text-slate-100">
+                    {formatConfidence(detection.confidence)}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-black/40">
+                  <div
+                    className="h-full rounded-full bg-sky-400/70"
+                    style={{ width: `${Math.round(detection.confidence * 100)}%` }}
+                  />
+                </div>
+                <div className="mt-1.5 flex items-start gap-1.5 text-[10px] text-[var(--muted-foreground)]">
+                  <ShieldAlert className="mt-0.5 h-3 w-3 text-amber-300" />
+                  <p>
+                    Confidence can be high even when policy context is wrong. Validate the
+                    surrounding clause, not only the highlighted token.
+                  </p>
+                </div>
               </section>
 
               <section className="rounded-md border border-[var(--border-subtle)] bg-[rgba(8,10,18,0.9)] px-2.5 py-2">
@@ -136,13 +160,13 @@ export function DetectionDetailDrawer({
               <section className="rounded-md border border-[var(--border-subtle)] bg-[rgba(8,10,18,0.9)] px-2.5 py-2">
                 <div className="mb-1.5 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-slate-200">
                   <Info className="h-3 w-3 text-emerald-300" />
-                  <span>Recommended reviewer posture</span>
+                  <span>Recommended action</span>
                 </div>
-                <p className="text-[11px] leading-relaxed text-slate-200">
-                  Treat the model as a helpful but fallible assistant. Confirm that redaction
-                  is consistent with your policy and scan nearby context for missed PII before
-                  approving.
-                </p>
+                <ul className="space-y-1 text-[10px] text-slate-200">
+                  <li>- Confirm entity belongs to policy scope (person, direct contact, ID).</li>
+                  <li>- Check nearby terms for related identifiers the model may have skipped.</li>
+                  <li>- Approve only when redaction keeps legal meaning intact.</li>
+                </ul>
               </section>
             </div>
           </motion.aside>

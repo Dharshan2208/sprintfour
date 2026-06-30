@@ -3,12 +3,8 @@ import { Detection } from "../lib/types";
 import { sortDetectionsForQueue } from "../lib/utils";
 
 export function useDetectionSelection(initialDetections: Detection[]) {
-  const [items, setItems] = useState<Detection[]>(
-    sortDetectionsForQueue(initialDetections),
-  );
-  const [activeId, setActiveId] = useState<string | null>(
-    initialDetections[0]?.id ?? null,
-  );
+  const [items, setItems] = useState<Detection[]>(sortDetectionsForQueue(initialDetections));
+  const [activeId, setActiveId] = useState<string | null>(initialDetections[0]?.id ?? null);
 
   const active = useMemo(
     () => items.find((d) => d.id === activeId) ?? null,
@@ -35,13 +31,18 @@ export function useDetectionSelection(initialDetections: Detection[]) {
   );
 
   const goToOffset = useCallback(
-    (offset: number) => {
+    (offset: number, reviewOnly = true) => {
       if (!items.length) return;
-      const index = items.findIndex((d) => d.id === activeId);
+      const candidates = reviewOnly
+        ? items.filter((d) => d.status === "unreviewed" || d.status === "missed")
+        : items;
+      if (!candidates.length) return;
+
+      const index = candidates.findIndex((d) => d.id === activeId);
       const next =
         index === -1
-          ? items[0]
-          : items[(index + offset + items.length) % items.length];
+          ? candidates[0]
+          : candidates[(index + offset + candidates.length) % candidates.length];
       setActiveId(next.id);
     },
     [items, activeId],
@@ -64,6 +65,17 @@ export function useDetectionSelection(initialDetections: Detection[]) {
       total: items.length,
       reviewed: items.filter((d) => d.status !== "unreviewed").length,
       unreviewed: items.filter((d) => d.status === "unreviewed").length,
+      unresolvedRisk: items.filter(
+        (d) => d.status === "unreviewed" || d.status === "missed",
+      ).length,
+      lowConfidence: items.filter(
+        (d) => (d.status === "unreviewed" || d.status === "missed") && d.confidence < 0.65,
+      ).length,
+      criticalOpen: items.filter(
+        (d) =>
+          (d.status === "unreviewed" || d.status === "missed") &&
+          (d.severity === "critical" || d.confidence < 0.4),
+      ).length,
     }),
     [items],
   );

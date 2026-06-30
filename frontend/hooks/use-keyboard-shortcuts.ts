@@ -1,35 +1,60 @@
 import { useEffect } from "react";
 
 interface Options {
-  onApprove?: () => void;
+  onPrimaryAction?: () => void;
   onReject?: () => void;
-  onMarkMissed?: () => void;
   onNext?: () => void;
+  onPrevious?: () => void;
+  onToggleDetails?: () => void;
+  onCloseSurface?: () => void;
 }
 
 export function useKeyboardShortcuts({
-  onApprove,
+  onPrimaryAction,
   onReject,
-  onMarkMissed,
   onNext,
+  onPrevious,
+  onToggleDetails,
+  onCloseSurface,
 }: Options) {
   useEffect(() => {
-    function handler(e: KeyboardEvent) {
-      if (e.target && (e.target as HTMLElement).tagName === "INPUT") return;
-      if (e.target && (e.target as HTMLElement).tagName === "TEXTAREA") return;
+    const isTypingInField = (target: EventTarget | null) => {
+      if (!target || !(target instanceof HTMLElement)) return false;
+      const tagName = target.tagName;
+      return (
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        target.isContentEditable
+      );
+    };
 
-      switch (e.key.toLowerCase()) {
-        case "a":
-          onApprove?.();
+    function handler(e: KeyboardEvent) {
+      if (isTypingInField(e.target)) return;
+
+      switch (e.key) {
+        case "ArrowDown":
+          onNext?.();
           e.preventDefault();
           break;
-        case "r":
+        case "ArrowUp":
+          onPrevious?.();
+          e.preventDefault();
+          break;
+        case "Enter":
+          onPrimaryAction?.();
+          e.preventDefault();
+          break;
+        case "Backspace":
+        case "Delete":
           onReject?.();
           e.preventDefault();
           break;
-        case "m":
-          onMarkMissed?.();
+        case " ":
+          onToggleDetails?.();
           e.preventDefault();
+          break;
+        case "Escape":
+          onCloseSurface?.();
           break;
         case "tab":
           onNext?.();
@@ -40,6 +65,6 @@ export function useKeyboardShortcuts({
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onApprove, onReject, onMarkMissed, onNext]);
+  }, [onPrimaryAction, onReject, onNext, onPrevious, onToggleDetails, onCloseSurface]);
 }
 

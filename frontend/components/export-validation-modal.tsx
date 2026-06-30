@@ -20,6 +20,7 @@ export function ExportValidationModal({
   const missed = detections.filter((d) => d.status === "missed");
 
   const hasRisk = unresolved.length > 0 || lowConfidence.length > 0 || missed.length > 0;
+  const reviewed = detections.filter((d) => d.status !== "unreviewed").length;
 
   return (
     <AnimatePresence>
@@ -64,6 +65,20 @@ export function ExportValidationModal({
               </header>
 
               <div className="space-y-3 text-[11px] text-[var(--muted-foreground)]">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-black/30 px-3 py-2">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span>Reviewed items</span>
+                    <span className="font-mono text-slate-100">
+                      {reviewed}/{detections.length}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 rounded-full bg-black/40">
+                    <div
+                      className="h-full rounded-full bg-emerald-400/75"
+                      style={{ width: `${Math.round((reviewed / detections.length) * 100)}%` }}
+                    />
+                  </div>
+                </div>
                 {hasRisk ? (
                   <>
                     <RiskRow

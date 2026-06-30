@@ -1,9 +1,13 @@
 import { ShieldCheck, FileText, Download } from "lucide-react";
-import { documentMetadata, reviewStats } from "../lib/mock-data";
+import { documentMetadata } from "../lib/mock-data";
 import { cn } from "../lib/utils";
 
-export function TopNav() {
-  const remaining = documentMetadata.unreviewedCount;
+interface TopNavProps {
+  remaining: number;
+  onExport: () => void;
+}
+
+export function TopNav({ remaining, onExport }: TopNavProps) {
 
   return (
     <header className="flex h-14 items-center border-b border-[var(--border-subtle)] bg-[rgba(9,10,16,0.92)] px-4 backdrop-blur-sm">
@@ -49,11 +53,13 @@ export function TopNav() {
             <span className="font-medium uppercase tracking-[0.16em]">
               Shortcuts
             </span>
-            <span>A = approve · R = reject · M = missed · Tab = next</span>
+            <span>↑/↓ navigate · Enter approve · Del reject · Space inspect</span>
           </div>
         </div>
 
         <button
+          type="button"
+          onClick={onExport}
           className={cn(
             "inline-flex items-center gap-1 rounded-md border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-100 shadow-sm",
             "hover:bg-emerald-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/80 focus-visible:ring-offset-0",

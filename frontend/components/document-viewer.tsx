@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useRef } from "react";
+import { motion } from "framer-motion";
 import { Detection } from "../lib/types";
 import { documentParagraphs } from "../lib/mock-data";
 import { cn } from "../lib/utils";
@@ -13,6 +15,21 @@ export function DocumentViewer({
   activeId,
   onSelect,
 }: DocumentViewerProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const paragraphRefs = useRef<Record<number, HTMLParagraphElement | null>>({});
+  const activeDetection = useMemo(
+    () => detections.find((d) => d.id === activeId) ?? null,
+    [detections, activeId],
+  );
+
+  useEffect(() => {
+    if (!activeDetection) return;
+    const target = paragraphRefs.current[activeDetection.paragraphIndex];
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [activeDetection]);
+
   const byParagraph = detections.reduce<Record<number, Detection[]>>(
     (acc, d) => {
       if (!acc[d.paragraphIndex]) acc[d.paragraphIndex] = [];
@@ -39,20 +56,46 @@ export function DocumentViewer({
           </span>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-[var(--muted-foreground)]">
-          <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 font-mono">
-            F · Focus mode
+          <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 font-mono text-[9px]">
+            Context focus
           </span>
         </div>
       </header>
 
-      <div className="scrollbar-thin relative flex-1 overflow-auto px-6 py-4 text-sm leading-relaxed">
+      <div
+        ref={containerRef}
+        className="scrollbar-thin relative flex-1 overflow-auto px-8 py-6 text-sm leading-relaxed"
+      >
         {documentParagraphs.map((paragraph, index) => (
-          <p key={index} className="mb-4 text-[13px] text-slate-100/90">
+          <motion.p
+            key={index}
+            ref={(el) => {
+              paragraphRefs.current[index] = el;
+            }}
+            animate={{
+              opacity:
+                activeDetection == null
+                  ? 1
+                  : activeDetection.paragraphIndex === index
+                    ? 1
+                    : 0.42,
+              filter:
+                activeDetection == null || activeDetection.paragraphIndex === index
+                  ? "blur(0px)"
+                  : "blur(0.4px)",
+            }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className={cn(
+              "mb-6 max-w-3xl text-[14px] leading-7 tracking-[0.003em] text-slate-100/90",
+              activeDetection?.paragraphIndex === index &&
+                "rounded-lg bg-sky-500/5 px-3 py-2 ring-1 ring-sky-500/30",
+            )}
+          >
             {renderParagraph(paragraph, byParagraph[index] ?? [], {
               activeId,
               onSelect,
             })}
-          </p>
+          </motion.p>
         ))}
       </div>
     </section>
@@ -107,33 +150,29 @@ function renderParagraph(
 
 function highlightClasses(d: Detection) {
   if (d.status === "rejected") {
-    return "bg-slate-800/40 text-slate-300/70 line-through";
+    return "bg-slate-800/30 text-slate-400/60 line-through";
   }
 
   if (d.status === "missed") {
-    return "border-b border-dashed border-sky-400/80 bg-sky-500/5";
+    return "rounded border border-sky-400/90 bg-sky-500/12 text-sky-50 shadow-[0_0_0_1px_rgba(56,189,248,0.4)]";
   }
 
   if (d.status === "approved") {
-    return "bg-emerald-500/10 text-emerald-100";
+    return "bg-red-500/12 text-red-50/70";
   }
 
   if (d.severity === "critical") {
-    return d.confidence >= 0.85
-      ? "bg-red-500/80 text-red-50 shadow-[0_0_0_1px_rgba(248,113,113,0.7)]"
-      : "bg-red-500/40 text-red-50/90";
+    return "bg-red-500/28 text-red-100";
   }
 
   if (d.severity === "high") {
-    return d.confidence >= 0.8
-      ? "bg-rose-500/70 text-rose-50"
-      : "bg-rose-500/40 text-rose-50/90";
+    return "bg-red-500/18 text-red-100/90";
   }
 
   if (d.severity === "medium") {
-    return "bg-amber-500/30 text-amber-50/90";
+    return "border-b border-dotted border-amber-400/80 bg-amber-500/14 text-amber-100";
   }
 
-  return "bg-sky-500/20 text-sky-50/90 underline decoration-sky-400/70";
+  return "border-b border-dotted border-amber-400/80 bg-amber-500/10 text-amber-100/85";
 }
 

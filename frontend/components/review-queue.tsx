@@ -1,6 +1,17 @@
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Detection } from "../lib/types";
 import { cn, formatConfidence, formatSeverity } from "../lib/utils";
-import { Check, X, AlertTriangle, ArrowRight, Search, Circle } from "lucide-react";
+import {
+  Check,
+  X,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Search,
+  Circle,
+  ShieldAlert,
+} from "lucide-react";
 
 interface ReviewQueueProps {
   items: Detection[];
@@ -9,7 +20,14 @@ interface ReviewQueueProps {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onMarkMissed: (id: string) => void;
-  stats: { total: number; reviewed: number; unreviewed: number };
+  stats: {
+    total: number;
+    reviewed: number;
+    unreviewed: number;
+    unresolvedRisk: number;
+    lowConfidence: number;
+    criticalOpen: number;
+  };
 }
 
 export function ReviewQueue({
@@ -21,62 +39,109 @@ export function ReviewQueue({
   onMarkMissed,
   stats,
 }: ReviewQueueProps) {
-  const critical = items.filter((d) => d.severity === "critical" && d.status === "unreviewed");
-  const needsReview = items.filter(
+  const [query, setQuery] = useState("");
+  const activeRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!activeRef.current) return;
+    activeRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeId]);
+
+  const search = query.trim().toLowerCase();
+  const visibleItems = search
+    ? items.filter((d) => {
+        const haystack =
+          `${d.text} ${d.kind} ${d.explanation} ${d.source} ${d.status}`.toLowerCase();
+        return haystack.includes(search);
+      })
+    : items;
+
+  const critical = visibleItems.filter(
+    (d) => (d.severity === "critical" || d.status === "missed") && d.status !== "approved",
+  );
+  const needsReview = visibleItems.filter(
     (d) => d.status === "unreviewed" && d.severity !== "critical",
   );
-  const reviewed = items.filter((d) => d.status !== "unreviewed");
+  const reviewed = visibleItems.filter((d) => d.status !== "unreviewed" && d.status !== "missed");
+  const completionPct = Math.round((stats.reviewed / Math.max(stats.total, 1)) * 100);
 
   return (
     <aside className="flex h-full flex-col rounded-xl border border-[var(--border-subtle)] bg-[rgba(9,11,20,0.98)]">
-      <header className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-4 py-2.5">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-            Review queue
-          </span>
-          <span className="text-[11px] text-[var(--muted-foreground)]">
-            Prioritized by residual risk, not model confidence alone.
-          </span>
-        </div>
-        <div className="flex flex-col items-end text-[10px] text-[var(--muted-foreground)]">
-          <span className="font-mono tabular-nums">
-            {stats.reviewed}/{stats.total} reviewed
-          </span>
-          <span className="text-[10px]">Tab to advance</span>
-        </div>
-      </header>
+      <div className="sticky top-0 z-10 border-b border-[var(--border-subtle)] bg-[rgba(9,11,20,0.98)]">
+        <header className="flex items-center justify-between gap-2 px-4 py-2.5">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+              Review queue
+            </span>
+            <span className="text-[11px] text-[var(--muted-foreground)]">
+              Triage unresolved risk before obvious model matches.
+            </span>
+          </div>
+          <div className="flex flex-col items-end text-[10px] text-[var(--muted-foreground)]">
+            <span className="font-mono tabular-nums">
+              {stats.reviewed}/{stats.total} reviewed
+            </span>
+            <span className="text-[10px]">Arrow keys navigate</span>
+          </div>
+        </header>
 
-      <div className="border-b border-[var(--border-subtle)] px-3 py-2">
-        <div className="flex items-center gap-2 rounded-md bg-[var(--muted)]/70 px-2 py-1.5 text-[11px] text-[var(--muted-foreground)]">
-          <Search className="h-3.5 w-3.5" />
-          <span className="flex-1 truncate">Filter by text, type, or status (⌘K)</span>
-          <span className="rounded bg-black/40 px-1 py-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-slate-300/80">
-            Coming soon
-          </span>
+        <div className="px-3 pb-2">
+          <div className="mb-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5">
+            <div className="mb-1 flex items-center justify-between text-[10px]">
+              <div className="flex items-center gap-1.5 text-amber-100">
+                <ShieldAlert className="h-3.5 w-3.5" />
+                <span>Unresolved risk</span>
+              </div>
+              <span className="font-mono text-amber-50">{stats.unresolvedRisk}</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-black/40">
+              <motion.div
+                className="h-full rounded-full bg-emerald-400/80"
+                initial={false}
+                animate={{ width: `${completionPct}%` }}
+                transition={{ duration: 0.2 }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[9px] text-[var(--muted-foreground)]">
+              <span>{completionPct}% complete</span>
+              <span>{stats.criticalOpen} critical open</span>
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--muted)]/70 px-2 py-1.5 text-[11px] text-[var(--muted-foreground)]">
+            <Search className="h-3.5 w-3.5" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search entity, type, source"
+              className="w-full bg-transparent outline-none placeholder:text-[var(--muted-foreground)]"
+            />
+          </label>
         </div>
       </div>
 
       <div className="scrollbar-thin flex-1 space-y-4 overflow-auto px-3 py-3">
         <SectionLabel
-          label="Critical issues"
+          label="Critical risks"
           count={critical.length}
           tone="destructive"
-          description="Highest residual risk · review with extra care."
+          description="Missed entities and high-impact risk signals."
         />
         <div className="space-y-2">
           {critical.length === 0 && (
             <EmptyHint label="No unresolved critical issues. Focus on uncertainty next." />
           )}
           {critical.map((d) => (
-            <QueueItem
-              key={d.id}
-              detection={d}
-              isActive={d.id === activeId}
-              onSelect={() => onSelect(d)}
-              onApprove={() => onApprove(d.id)}
-              onReject={() => onReject(d.id)}
-              onMarkMissed={() => onMarkMissed(d.id)}
-            />
+            <div key={d.id} ref={d.id === activeId ? activeRef : undefined}>
+              <QueueItem
+                detection={d}
+                isActive={d.id === activeId}
+                onSelect={() => onSelect(d)}
+                onApprove={() => onApprove(d.id)}
+                onReject={() => onReject(d.id)}
+                onMarkMissed={() => onMarkMissed(d.id)}
+              />
+            </div>
           ))}
         </div>
 
@@ -91,15 +156,16 @@ export function ReviewQueue({
             <EmptyHint label="All model flags reviewed. Scan for missed PII before export." />
           )}
           {needsReview.map((d) => (
-            <QueueItem
-              key={d.id}
-              detection={d}
-              isActive={d.id === activeId}
-              onSelect={() => onSelect(d)}
-              onApprove={() => onApprove(d.id)}
-              onReject={() => onReject(d.id)}
-              onMarkMissed={() => onMarkMissed(d.id)}
-            />
+            <div key={d.id} ref={d.id === activeId ? activeRef : undefined}>
+              <QueueItem
+                detection={d}
+                isActive={d.id === activeId}
+                onSelect={() => onSelect(d)}
+                onApprove={() => onApprove(d.id)}
+                onReject={() => onReject(d.id)}
+                onMarkMissed={() => onMarkMissed(d.id)}
+              />
+            </div>
           ))}
         </div>
 
@@ -123,21 +189,26 @@ export function ReviewQueue({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <kbd className="rounded border border-[var(--border-subtle)] bg-black/30 px-1.5 py-0.5 font-mono text-[9px]">
-              A
+              ↑
+            </kbd>
+            <span>Previous</span>
+            <kbd className="ml-2 rounded border border-[var(--border-subtle)] bg-black/30 px-1.5 py-0.5 font-mono text-[9px]">
+              ↓
+            </kbd>
+            <span>Next</span>
+            <kbd className="ml-2 rounded border border-[var(--border-subtle)] bg-black/30 px-1.5 py-0.5 font-mono text-[9px]">
+              Enter
             </kbd>
             <span>Approve</span>
             <kbd className="ml-2 rounded border border-[var(--border-subtle)] bg-black/30 px-1.5 py-0.5 font-mono text-[9px]">
-              R
+              Del
             </kbd>
             <span>Reject</span>
-            <kbd className="ml-2 rounded border border-[var(--border-subtle)] bg-black/30 px-1.5 py-0.5 font-mono text-[9px]">
-              M
-            </kbd>
-            <span>Mark missed</span>
           </div>
           <div className="flex items-center gap-1 text-[9px]">
-            <ArrowRight className="h-3 w-3" />
-            <span>Tab to advance</span>
+            <ArrowUp className="h-3 w-3" />
+            <ArrowDown className="h-3 w-3" />
+            <span>Space = details</span>
           </div>
         </div>
       </footer>
@@ -202,70 +273,57 @@ function QueueItem({
   onMarkMissed: () => void;
 }) {
   return (
-    <article
-      className={cn(
-        "group rounded-lg border px-3 py-2 text-xs transition",
-        "border-[var(--border-subtle)] bg-[rgba(10,12,20,0.9)] hover:border-sky-500/60 hover:bg-sky-500/5",
-        isActive && "border-sky-400/80 bg-sky-500/10 shadow-[0_0_0_1px_rgba(56,189,248,0.5)]",
-      )}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        className="flex w-full flex-col items-start gap-1 text-left"
+    <AnimatePresence initial={false}>
+      <motion.article
+        layout
+        transition={{ duration: 0.16 }}
+        className={cn(
+          "group rounded-lg border px-3 py-2 text-xs transition",
+          "border-[var(--border-subtle)] bg-[rgba(10,12,20,0.9)] hover:-translate-y-[1px] hover:border-sky-500/60 hover:bg-sky-500/5",
+          isActive &&
+            "border-sky-400/80 bg-sky-500/10 shadow-[0_0_0_1px_rgba(56,189,248,0.5),0_0_24px_rgba(56,189,248,0.18)]",
+        )}
       >
-        <div className="flex w-full items-start justify-between gap-2">
-          <p className="line-clamp-2 font-mono text-[11px] text-slate-100">
-            {detection.text}
+        <button
+          type="button"
+          onClick={onSelect}
+          className="flex w-full flex-col items-start gap-1 text-left"
+        >
+          <div className="flex w-full items-start justify-between gap-2">
+            <p className="line-clamp-2 font-mono text-[11px] text-slate-100">{detection.text}</p>
+            <SeverityPill detection={detection} />
+          </div>
+          <p className="line-clamp-2 text-[11px] text-[var(--muted-foreground)]">
+            {detection.explanation}
           </p>
-          <SeverityPill detection={detection} />
-        </div>
-        <p className="line-clamp-2 text-[11px] text-[var(--muted-foreground)]">
-          {detection.explanation}
-        </p>
-      </button>
+        </button>
 
-      <div className="mt-2 flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-black/40 px-1.5 py-0.5 font-mono text-[9px]">
-            {formatConfidence(detection.confidence)}
-          </span>
-          <span className="uppercase tracking-[0.16em]">
-            {detection.kind.toUpperCase()}
-          </span>
+        <div className="mt-2 flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-black/40 px-1.5 py-0.5 font-mono text-[9px]">
+              {formatConfidence(detection.confidence)}
+            </span>
+            <span className="uppercase tracking-[0.16em]">{detection.kind.toUpperCase()}</span>
+          </div>
+          <span>{detection.source}</span>
         </div>
-        <span>Src: {detection.source}</span>
-      </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <ActionChip
-            label="Approve"
-            hint="A"
-            tone="success"
-            icon={Check}
-            onClick={onApprove}
-          />
-          <ActionChip
-            label="Reject"
-            hint="R"
-            tone="muted"
-            icon={X}
-            onClick={onReject}
-          />
-          <ActionChip
-            label="Mark missed"
-            hint="M"
-            tone="warning"
-            icon={AlertTriangle}
-            onClick={onMarkMissed}
-          />
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <ActionChip label="Approve" hint="Enter" tone="success" icon={Check} onClick={onApprove} />
+            <ActionChip label="Reject" hint="Del" tone="muted" icon={X} onClick={onReject} />
+            <ActionChip
+              label="Missed"
+              hint="M"
+              tone="warning"
+              icon={AlertTriangle}
+              onClick={onMarkMissed}
+            />
+          </div>
+          <span className="text-[9px] text-[var(--muted-foreground)]">Space: inspect</span>
         </div>
-        <span className="text-[9px] text-[var(--muted-foreground)]">
-          Enter / click to inspect
-        </span>
-      </div>
-    </article>
+      </motion.article>
+    </AnimatePresence>
   );
 }
 
